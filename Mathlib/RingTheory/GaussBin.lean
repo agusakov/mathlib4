@@ -3,6 +3,7 @@ import Mathlib.LinearAlgebra.FiniteDimensional.Lemmas
 import Mathlib.LinearAlgebra.Quotient.Basic
 import Mathlib.Algebra.Module.Projective
 import Mathlib.LinearAlgebra.Prod
+import Mathlib.RingTheory.Grassmannian
 
 
 /-!
@@ -18,7 +19,10 @@ requiring more imports).
 gaussian binomial coefficient
 -/
 
--- open scoped Classical
+/-
+Note: I don't think this is possible to do via quotients. Or at least, I'm having a lot of trouble
+trying to figure out how to do it.
+-/
 
 universe u v
 
@@ -28,6 +32,8 @@ variable [AddCommGroup W] [Module K W]
 
 namespace Submodule
 open LinearMap QuotientAddGroup
+
+section quot_bijectionOne
 
 /-
 Do I need this?
@@ -40,7 +46,9 @@ noncomputable def quotientEquiv : (fst K V W) ≃ₗ[K] ((V × W) ⧸ (snd K V W
   · exact (_root_.id (IsCompl.symm h)).disjoint
   · exact (_root_.id (IsCompl.symm h)).codisjoint
 
-section bijectionOne
+end quot_bijectionOne
+
+section prod_bijectionOne
 
 lemma oneDimDisjoint (X : Submodule K (V × K))
 (hX : ¬ (snd K V K) ≤ X) : X ⊓ (snd K V K) = ⊥ := by
@@ -174,9 +182,9 @@ noncomputable def equiv_ofOneDimDisjoint :
   simp_rw [memRangereconstructMapIff]
   apply (Equiv.ofInjective (reconstructMap V K) reconstructMapInjective).symm
 
-end bijectionOne
+end prod_bijectionOne
 
-section bijectionTwo
+section prod_bijectionTwo
 
 /-
 Second bijection complete
@@ -209,14 +217,45 @@ def equiv_ofOneDimSubmodule (V W : Type*) (K : Type*) [Field K] [AddCommGroup V]
       obtain ⟨a, ⟨ha1, rfl⟩⟩ := hx
       exact (Quotient.mk_eq_zero r).mp (congrArg Quotient.mk ha1)
 
-end bijectionTwo
+end prod_bijectionTwo
 
-/-section bijectionMain
+section disjointSum
 
-def equiv_disjointSum :
-  Submodule K (V × K) ≃ Submodule K V ⊕ (X : Submodule K V) × (X →ₗ[K] K) := by sorry
+--variable [DecidableEq K] [DecidableEq V] [Decidable (snd K V K ≤ (x : Submodule (V × K)))]
+/-
+What decidability do we need?
+-/
+open Classical in noncomputable def mapDisjointSum (V : Type v) (K : Type*) [Field K]
+[AddCommGroup V] [Module K V] :
+  Submodule K (V × K) ≃ (Submodule K V ⊕ ((X : Submodule K V) × (X →ₗ[K] K))) where
+    toFun := fun X => if h : (snd K V K) ≤ X
+      then Sum.inl (equiv_ofOneDimSubmodule V K K ⟨X, h⟩)
+      else Sum.inr (equiv_ofOneDimDisjoint.toFun ⟨X, h⟩)
+    invFun := sorry
+    left_inv := sorry
+    right_inv := sorry
 
-end bijectionMain-/
+end disjointSum
+
+section Grassmannian
+
+open Module Grassmannian
+
+variable [Module.Finite K V]
+
+lemma grassmannianFinrank (k : ℕ) (X : G(k, V; K)) :
+  Module.finrank K X = (Module.finrank K V) - k := by
+  have h2 := Module.Grassmannian.rankAtStalk_eq X
+  simp only [rankAtStalk_eq_finrank_of_free, Pi.natCast_apply, Nat.cast_id, forall_const] at h2
+  simp_rw [← h2]
+  rw [Submodule.finrank_quotient, Nat.sub_sub_self]
+  apply Submodule.finrank_le
+
+lemma grassmannianFinrank' (k : ℕ) (X : G((Module.finrank K V) - k, V; K))
+ (hk : k ≤ Module.finrank K V) : Module.finrank K X = k := by
+  rw [grassmannianFinrank, Nat.sub_sub_self hk]
+
+end Grassmannian
 
 section dimension
 
@@ -238,17 +277,27 @@ lemma subspaceDim_ofOneDimDisjoint (X : Submodule K (V × K)) (hX : ¬ (snd K V 
   LinearEquiv.finrank_eq (submoduleEquiv_ofOneDimDisjoint X hX)
 
 variable [FiniteDimensional K V] [FiniteDimensional K W]
+
 /-
 If (snd K V K) ≤ X, we can break up the dimension of X
 -/
 lemma subspaceDim_ofOneDimSubspace (X : Submodule K (V × W)) (hX : (snd K V W) ≤ X) :
   Module.finrank K X =
-    Module.finrank K (Submodule.map (LinearMap.fst K V W) X) + Module.finrank K W := by
+  Module.finrank K (Submodule.map (LinearMap.fst K V W) X) + Module.finrank K W := by
     rw [snd, comap_bot] at hX
     rw [← LinearMap.finrank_range_add_finrank_ker ((LinearMap.fst K V W).domRestrict X),
       range_domRestrict, Nat.add_left_cancel_iff, ker_domRestrict,
       LinearEquiv.finrank_eq (Submodule.comapSubtypeEquivOfLe hX), ker_fst,
       LinearEquiv.finrank_eq (LinearEquiv.ofInjective (inr K V W) inr_injective)]
+
+/-
+
+-/
+--lemma finrankRelation (X : Submodule K (V × W)) : Fintype.card
+
+
+/-lemma fintypeCard_SubspaceDim : Fintype.card (Submodule K (V × K))
+  = Fintype.card -/
 
 end dimension
 
